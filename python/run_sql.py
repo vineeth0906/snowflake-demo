@@ -1,3 +1,32 @@
+import os
+import pandas as pd   # ✅ THIS WAS MISSING
+import snowflake.connector
+from snowflake.connector.pandas_tools import write_pandas
+
+# Connect to Snowflake
+conn = snowflake.connector.connect(
+    account=os.environ["SNOWFLAKE_ACCOUNT"],
+    user=os.environ["SNOWFLAKE_USER"],
+    password=os.environ["SNOWFLAKE_PASSWORD"],
+    role=os.environ["SNOWFLAKE_ROLE"],
+    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
+    ocsp_fail_open=True
+)
+
+cursor = conn.cursor()
+
+def run_sql_file(path):
+    with open(path, "r") as f:
+        sql_text = f.read()
+
+    for stmt in sql_text.split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
+
+print("🏗️ Creating RAW layer objects")
+run_sql_file("sql/raw.sql")
+
 print("🔄 Loading RAW data")
 
 customers_df = pd.read_csv("data/customers.csv")
@@ -22,3 +51,14 @@ write_pandas(
 )
 
 print("✅ RAW load completed")
+
+print("▶ Running CURATED layer")
+run_sql_file("sql/curated.sql")
+
+print("▶ Running PUBLISH layer")
+run_sql_file("sql/publish.sql")
+
+cursor.close()
+conn.close()
+
+print("🎉 PIPELINE COMPLETED SUCCESSFULLY")
