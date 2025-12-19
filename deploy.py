@@ -2,10 +2,13 @@
 import os
 import yaml
 import snowflake.connector
-from dotenv import load_dotenv
-
-# Load .env (optional) so CI/local .env values can override config
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # Load .env (optional) so CI/local .env values can override config
+    load_dotenv()
+except Exception:
+    # python-dotenv not installed; continue without loading .env
+    pass
 
 # Load config
 with open('config.yaml') as f:
