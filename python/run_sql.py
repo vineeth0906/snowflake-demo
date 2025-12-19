@@ -1,7 +1,12 @@
 import os
-import pandas as pd   # ✅ THIS WAS MISSING
+import pandas as pd
+import subprocess
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
+
+# Generate fresh data every run
+os.makedirs("data", exist_ok=True)
+subprocess.run(["python", "python/generate_data.py"], check=True)
 
 # Connect to Snowflake
 conn = snowflake.connector.connect(
@@ -16,26 +21,23 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 def run_sql_file(path):
-    with open(path, "r") as f:
-        sql_text = f.read()
+    with open(path) as f:
+        for stmt in f.read().split(";"):
+            stmt = stmt.strip()
+            if stmt:
+                cursor.execute(stmt)
 
-    for stmt in sql_text.split(";"):
-        stmt = stmt.strip()
-        if stmt:
-            cursor.execute(stmt)
-
-print("🏗️ Creating RAW layer objects")
+print("🏗️ Creating RAW layer")
 run_sql_file("sql/raw.sql")
 
 print("🔄 Loading RAW data")
-
 customers_df = pd.read_csv("data/customers.csv")
 orders_df = pd.read_csv("data/orders.csv")
 
 write_pandas(
     conn,
     customers_df,
-    table_name="CUSTOMERS_RAW",
+    "CUSTOMERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False
@@ -44,7 +46,7 @@ write_pandas(
 write_pandas(
     conn,
     orders_df,
-    table_name="ORDERS_RAW",
+    "ORDERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False

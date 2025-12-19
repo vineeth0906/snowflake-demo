@@ -1,32 +1,27 @@
-name: Snowflake Medallion Deployment
+name: Snowflake SQL Deployment
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo
         uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: Generate data
-        run: |
-          python python/generate_data.py
-
-      - name: Run pipeline
+      - name: Run Snowflake pipeline
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
@@ -34,6 +29,5 @@ jobs:
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
           SNOWFLAKE_OCSP_FAIL_OPEN: true
-          SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false
         run: |
           python python/run_sql.py

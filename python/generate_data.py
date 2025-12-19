@@ -1,82 +1,33 @@
 import pandas as pd
 import random
-from datetime import datetime, timedelta
-import uuid
+from datetime import date
+import os
 
-# -----------------------------
-# CONFIG
-# -----------------------------
-CUSTOMER_COUNT = 50
-ORDER_COUNT = 120
+os.makedirs("data", exist_ok=True)
 
-COUNTRIES = ["US", "UK", "IN", "CA", "AU"]
-PRODUCTS = ["Laptop", "Mobile", "Tablet", "Monitor", "Headphones"]
-STATUSES_CUSTOMER = ["Active", "Inactive"]
-STATUSES_ORDER = ["Shipped", "Pending", "Cancelled"]
+customers = []
+for i in range(1, 11):
+    customers.append({
+        "CUSTOMER_ID": i,
+        "FIRST_NAME": f"First{i}",
+        "LAST_NAME": f"Last{i}",
+        "EMAIL": f"user{i}@mail.com",
+        "COUNTRY": random.choice(["US", "IN", "UK"]),
+        "SIGNUP_DATE": date.today(),
+        "STATUS": "ACTIVE"
+    })
 
+orders = []
+for i in range(1, 21):
+    orders.append({
+        "ORDER_ID": i,
+        "CUSTOMER_ID": random.randint(1, 10),
+        "ORDER_DATE": date.today(),
+        "AMOUNT": random.randint(100, 5000),
+        "STATUS": "COMPLETED"
+    })
 
-# -----------------------------
-# CUSTOMER DATA
-# -----------------------------
-def generate_customers():
-    customers = []
+pd.DataFrame(customers).to_csv("data/customers.csv", index=False)
+pd.DataFrame(orders).to_csv("data/orders.csv", index=False)
 
-    for _ in range(CUSTOMER_COUNT):
-        customer_id = random.randint(100000, 999999)
-
-        customers.append({
-            "customer_id": customer_id,
-            "first_name": f"FN_{customer_id}",
-            "last_name": f"LN_{customer_id}",
-            "email": f"user_{customer_id}@demo.com",
-            "country": random.choice(COUNTRIES),
-            "signup_date": (
-                datetime.now() - timedelta(days=random.randint(1, 1500))
-            ).date(),
-            "status": random.choice(STATUSES_CUSTOMER)
-        })
-
-    return pd.DataFrame(customers)
-
-
-# -----------------------------
-# ORDER DATA
-# -----------------------------
-def generate_orders(customers_df):
-    orders = []
-
-    customer_ids = customers_df["customer_id"].tolist()
-
-    for _ in range(ORDER_COUNT):
-        order_id = uuid.uuid4().int % 1_000_000
-
-        orders.append({
-            "order_id": order_id,
-            "customer_id": random.choice(customer_ids),
-            "product": random.choice(PRODUCTS),
-            "quantity": random.randint(1, 5),
-            "amount": round(random.uniform(100, 5000), 2),
-            "order_date": (
-                datetime.now() - timedelta(days=random.randint(1, 365))
-            ).date(),
-            "status": random.choice(STATUSES_ORDER)
-        })
-
-    return pd.DataFrame(orders)
-
-
-# -----------------------------
-# MAIN
-# -----------------------------
-if __name__ == "__main__":
-    print("🔄 Generating fresh demo data...")
-
-    customers_df = generate_customers()
-    orders_df = generate_orders(customers_df)
-
-    customers_df.to_csv("customers.csv", index=False)
-    orders_df.to_csv("orders.csv", index=False)
-
-    print("✅ New customers.csv and orders.csv generated")
-    print(f"   Customers: {len(customers_df)}")
-    print(f"   Orders   : {len(orders_df)}")
+print("✅ Data generated successfully")
