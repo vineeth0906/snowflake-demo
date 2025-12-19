@@ -3,6 +3,7 @@ CI SAFE RAW LOAD
 - No S3
 - No PUT
 - No pandas
+- Correct Snowflake parameter binding
 """
 
 import os
@@ -28,17 +29,17 @@ cursor = conn.cursor()
 try:
     print("=== Loading to Raw Layer (NO S3, CI SAFE) ===")
 
-    # -----------------------
-    # CUSTOMERS
-    # -----------------------
+    # =========================
+    # LOAD CUSTOMERS
+    # =========================
     print("Loading customers...")
     cursor.execute("TRUNCATE TABLE CUSTOMERS_RAW")
 
-    rows = []
+    customer_rows = []
     with open(DATA_DIR / "customers.csv") as f:
         reader = csv.DictReader(f)
         for r in reader:
-            rows.append((
+            customer_rows.append((
                 int(r["customer_id"]),
                 r["customer_name"],
                 r["email"],
@@ -54,24 +55,24 @@ try:
         INSERT INTO CUSTOMERS_RAW
         (customer_id, customer_name, email, country,
          country_code, signup_date, status, loyalty_points)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        rows
+        customer_rows
     )
 
-    print(f"✓ Loaded {len(rows)} customers")
+    print(f"✓ Loaded {len(customer_rows)} customers")
 
-    # -----------------------
-    # ORDERS
-    # -----------------------
+    # =========================
+    # LOAD ORDERS
+    # =========================
     print("Loading orders...")
     cursor.execute("TRUNCATE TABLE ORDERS_RAW")
 
-    rows = []
+    order_rows = []
     with open(DATA_DIR / "orders.csv") as f:
         reader = csv.DictReader(f)
         for r in reader:
-            rows.append((
+            order_rows.append((
                 int(r["order_id"]),
                 int(r["customer_id"]),
                 r["product"],
@@ -86,12 +87,12 @@ try:
         INSERT INTO ORDERS_RAW
         (order_id, customer_id, product,
          quantity, amount, order_date, status)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
-        rows
+        order_rows
     )
 
-    print(f"✓ Loaded {len(rows)} orders")
+    print(f"✓ Loaded {len(order_rows)} orders")
 
     conn.commit()
     print("✅ RAW layer load completed successfully")
