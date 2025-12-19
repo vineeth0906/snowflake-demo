@@ -1,52 +1,66 @@
-import csv
+import pandas as pd
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Create data folder
-Path("data").mkdir(exist_ok=True)
+# Output directory
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
 
-# Generate Customers
-print("Generating customers.csv...")
-with open('data/customers.csv', 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['customer_id', 'first_name', 'last_name', 'email', 'country', 'signup_date', 'status'])
-    
-    countries = ['USA', 'UK', 'Canada', 'Germany', 'France']
-    for i in range(1, 101):
-        signup = datetime.now() - timedelta(days=random.randint(1, 365))
-        writer.writerow([
-            i,
-            f'First{i}',
-            f'Last{i}',
-            f'customer{i}@email.com',
-            random.choice(countries),
-            signup.strftime('%Y-%m-%d'),
-            random.choice(['Active', 'Inactive'])
-        ])
+# Unique seed per run (IMPORTANT)
+run_id = int(datetime.utcnow().timestamp())
 
-print("✓ Created customers.csv (100 rows)")
+num_customers = 100
+num_orders = 300
 
-# Generate Orders
-print("Generating orders.csv...")
-with open('data/orders.csv', 'w', newline='') as f:
-    writer = csv.writer(f)
-    writer.writerow(['order_id', 'customer_id', 'product', 'quantity', 'amount', 'order_date', 'status'])
-    
-    products = ['Laptop', 'Phone', 'Tablet', 'Monitor', 'Keyboard']
-    for i in range(1, 501):
-        order_date = datetime.now() - timedelta(days=random.randint(1, 180))
-        qty = random.randint(1, 5)
-        amount = round(qty * random.uniform(100, 2000), 2)
-        writer.writerow([
-            i,
-            random.randint(1, 100),
-            random.choice(products),
-            qty,
-            amount,
-            order_date.strftime('%Y-%m-%d'),
-            random.choice(['Completed', 'Pending', 'Shipped'])
-        ])
+countries = [
+    ("USA", "US"), ("India", "IN"), ("UK", "GB"),
+    ("Canada", "CA"), ("Germany", "DE")
+]
 
-print("✓ Created orders.csv (500 rows)")
-print("\n✅ Data generation completed!")
+products = ["Laptop", "Mobile", "Tablet", "Headphones"]
+
+# -----------------------
+# Customers
+# -----------------------
+customers = []
+for i in range(num_customers):
+    customer_id = run_id + i
+    country, country_code = random.choice(countries)
+
+    customers.append({
+        "customer_id": customer_id,
+        "customer_name": f"First{i} Last{i}",
+        "email": f"customer{customer_id}@email.com",
+        "country": country,
+        "country_code": country_code,
+        "signup_date": datetime.utcnow().date(),
+        "status": random.choice(["Active", "Inactive"]),
+        "loyalty_points": random.randint(0, 5000)
+    })
+
+customers_df = pd.DataFrame(customers)
+customers_df.to_csv(DATA_DIR / "customers.csv", index=False)
+
+# -----------------------
+# Orders (INTENTIONALLY MULTIPLE PER CUSTOMER)
+# -----------------------
+orders = []
+for i in range(num_orders):
+    order_id = run_id + i  # unique per run
+    customer = random.choice(customers)
+
+    orders.append({
+        "order_id": order_id,
+        "customer_id": customer["customer_id"],
+        "product": random.choice(products),
+        "quantity": random.randint(1, 5),
+        "amount": random.randint(100, 2000),
+        "order_date": datetime.utcnow() - timedelta(days=random.randint(0, 30)),
+        "status": random.choice(["Shipped", "Pending", "Cancelled"])
+    })
+
+orders_df = pd.DataFrame(orders)
+orders_df.to_csv(DATA_DIR / "orders.csv", index=False)
+
+print("✅ New customer & order data generated")
