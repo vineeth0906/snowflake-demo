@@ -1,91 +1,33 @@
-name: Snowflake Medallion Deployment
+# ---------------------------
+# Upload CSVs to Snowflake
+# ---------------------------
+- name: Upload CSVs to Snowflake
+  env:
+    SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+    SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+    SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+    SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+    SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
 
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
+    # 🔥 REQUIRED FIX
+    SNOWFLAKE_OCSP_FAIL_OPEN: true
+    SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false
 
-jobs:
-  snowflake-deploy:
-    runs-on: ubuntu-latest
+  run: |
+    python - <<EOF
+    import snowflake.connector, os
 
-    steps:
-    # ---------------------------
-    # 1️⃣ Checkout Repository
-    # ---------------------------
-    - name: Checkout code
-      uses: actions/checkout@v4
+    conn = snowflake.connector.connect(
+        account=os.environ["SNOWFLAKE_ACCOUNT"],
+        user=os.environ["SNOWFLAKE_USER"],
+        password=os.environ["SNOWFLAKE_PASSWORD"],
+        role=os.environ["SNOWFLAKE_ROLE"],
+        warehouse=os.environ["SNOWFLAKE_WAREHOUSE"]
+    )
 
-    # ---------------------------
-    # 2️⃣ Setup Python
-    # ---------------------------
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    # ---------------------------
-    # 3️⃣ Install Dependencies
-    # ---------------------------
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    # ---------------------------
-    # 4️⃣ Generate Sample Data
-    # ---------------------------
-    - name: Generate CSV data
-      run: |
-        python python/generate_data.py
-
-    # ---------------------------
-    # 5️⃣ Upload CSVs to Snowflake User Stage
-    # ---------------------------
-    - name: Upload CSVs to Snowflake
-      env:
-        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      run: |
-        python - <<EOF
-        import snowflake.connector
-
-        conn = snowflake.connector.connect(
-            account="${{ secrets.SNOWFLAKE_ACCOUNT }}",
-            user="${{ secrets.SNOWFLAKE_USER }}",
-            password="${{ secrets.SNOWFLAKE_PASSWORD }}",
-            role="${{ secrets.SNOWFLAKE_ROLE }}",
-            warehouse="${{ secrets.SNOWFLAKE_WAREHOUSE }}"
-        )
-
-        cur = conn.cursor()
-
-        cur.execute("PUT file://customers.csv @~ AUTO_COMPRESS=FALSE")
-        cur.execute("PUT file://orders.csv @~ AUTO_COMPRESS=FALSE")
-
-        cur.close()
-        conn.close()
-        EOF
-
-    # ---------------------------
-    # 6️⃣ Run Snowflake SQL Layers
-    # ---------------------------
-    - name: Run Snowflake SQL
-      env:
-        SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-        SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-        SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-        SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-        SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-      run: |
-        python python/run_sql.py
-
-    # ---------------------------
-    # 7️⃣ Completion Message
-    # ---------------------------
-    - name: Pipeline completed
-      run: echo "✅ Snowflake Medallion Deployment Successful"
+    cur = conn.cursor()
+    cur.execute("PUT file://customers.csv @~ AUTO_COMPRESS=FALSE")
+    cur.execute("PUT file://orders.csv @~ AUTO_COMPRESS=FALSE")
+    cur.close()
+    conn.close()
+    EOF
