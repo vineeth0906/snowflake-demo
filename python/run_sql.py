@@ -27,9 +27,9 @@ def run_sql_file(path: str):
     with open(path, "r") as f:
         sql_text = f.read()
 
-    sql_buffer = io.StringIO(sql_text)
+    buffer = io.StringIO(sql_text)
 
-    for stmt in split_statements(sql_buffer):
+    for stmt, _ in split_statements(buffer):
         stmt = stmt.strip()
         if stmt:
             cursor.execute(stmt)
@@ -41,7 +41,7 @@ print("🏗️ Creating RAW layer objects")
 run_sql_file("sql/raw.sql")
 
 # --------------------------------------------------
-# 2️⃣ LOAD RAW DATA (NO S3)
+# 2️⃣ LOAD RAW DATA
 # --------------------------------------------------
 print("🔄 Loading RAW data using write_pandas()")
 
