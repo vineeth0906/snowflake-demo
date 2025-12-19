@@ -1,7 +1,9 @@
 snowflake:
   account: "yu17267.us-east-2.aws"    
-  user: "vineethg"
-  password: "Siravineeth@2026"
+  # For security, do NOT store sensitive credentials here.
+  # Set `SNOWFLAKE_USER` and `SNOWFLAKE_PASSWORD` in your environment or a .env file.
+  user: "YOUR_USERNAME"
+  password: "YOUR_PASSWORD"
   role: "ACCOUNTADMIN"
   warehouse: "COMPUTE_WH"
 

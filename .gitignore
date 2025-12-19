@@ -10,3 +10,6 @@ data/
 # IDE
 .vscode/
 .idea/
+
+# Local secrets
+.env

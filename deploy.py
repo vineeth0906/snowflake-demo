@@ -2,6 +2,10 @@
 import os
 import yaml
 import snowflake.connector
+from dotenv import load_dotenv
+
+# Load .env (optional) so CI/local .env values can override config
+load_dotenv()
 
 # Load config
 with open('config.yaml') as f:
@@ -46,6 +50,7 @@ cursor.execute(f"""
 cursor.execute(f"""
     CREATE FILE FORMAT IF NOT EXISTS {config['databases']['raw']}.STAGE.CSV_FORMAT
     TYPE='CSV' FIELD_DELIMITER=',' SKIP_HEADER=1 NULL_IF=('NULL','null','')
+    ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE
 """)
 print("✓ Stage created")
 
