@@ -1,0 +1,49 @@
+name: Snowflake Pipeline
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install snowflake-connector-python pyyaml
+      
+      - name: Generate data
+        run: python generate_data.py
+      
+      - name: Deploy infrastructure
+        run: python deploy.py
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      
+      - name: Load raw data
+        run: python load_raw.py
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      
+      - name: Transform data
+        run: python transform.py
+        env:
+          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      
+      - name: Summary
+        run: |
+          echo "✅ Pipeline completed successfully!"
+          echo "📊 Data loaded through medallion layers:"
+          echo "   🥉 RAW_DB.STAGE (customers_raw, orders_raw)"
+          echo "   🥈 CURATED_DB.DATA (customers, orders)"
+          echo "   🥇 PUBLISH_DB.ANALYTICS (customer_summary, daily_sales)"

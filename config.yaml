@@ -1,0 +1,12 @@
+snowflake:
+  account: "yu17267.us-east-2.aws"    
+  user: "vineethg"
+  password: "Siravineeth@2026"
+  role: "ACCOUNTADMIN"
+  warehouse: "COMPUTE_WH"
+
+databases:
+  raw: "RAW_DB"
+  curated: "CURATED_DB"
+  publish: "PUBLISH_DB"
+
