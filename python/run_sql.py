@@ -1,56 +1,7 @@
-import os
-import io
-import pandas as pd
-import snowflake.connector
-from snowflake.connector.pandas_tools import write_pandas
-from snowflake.connector.util_text import split_statements
+print("🔄 Loading RAW data")
 
-# --------------------------------------------------
-# Connect to Snowflake
-# --------------------------------------------------
-conn = snowflake.connector.connect(
-    account=os.environ["SNOWFLAKE_ACCOUNT"],
-    user=os.environ["SNOWFLAKE_USER"],
-    password=os.environ["SNOWFLAKE_PASSWORD"],
-    role=os.environ["SNOWFLAKE_ROLE"],
-    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    ocsp_fail_open=True,
-    insecure_mode=True
-)
-
-cursor = conn.cursor()
-
-# --------------------------------------------------
-# Helper: execute multi-statement SQL
-# --------------------------------------------------
-def run_sql_file(path):
-    with open(path) as f:
-        buffer = io.StringIO(f.read())
-        for stmt, _ in split_statements(buffer):
-            stmt = stmt.strip()
-            if stmt:
-                cursor.execute(stmt)
-
-# --------------------------------------------------
-# 1️⃣ RAW DDL
-# --------------------------------------------------
-print("🏗️ Creating RAW layer objects")
-run_sql_file("sql/raw.sql")
-
-# --------------------------------------------------
-# 2️⃣ LOAD RAW DATA (FIXED)
-# --------------------------------------------------
-print("🔄 Loading RAW data using write_pandas()")
-
-customers_df = pd.read_csv("customers.csv")
-orders_df = pd.read_csv("orders.csv")
-
-# 🔑 THIS IS THE FIX
-customers_df.columns = [c.upper() for c in customers_df.columns]
-orders_df.columns = [c.upper() for c in orders_df.columns]
-
-cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.CUSTOMERS_RAW")
-cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.ORDERS_RAW")
+customers_df = pd.read_csv("data/customers.csv")
+orders_df = pd.read_csv("data/orders.csv")
 
 write_pandas(
     conn,
@@ -71,17 +22,3 @@ write_pandas(
 )
 
 print("✅ RAW load completed")
-
-# --------------------------------------------------
-# 3️⃣ CURATED + PUBLISH
-# --------------------------------------------------
-print("▶ Running CURATED layer")
-run_sql_file("sql/curated.sql")
-
-print("▶ Running PUBLISH layer")
-run_sql_file("sql/publish.sql")
-
-cursor.close()
-conn.close()
-
-print("✅ Snowflake deployment completed successfully")
