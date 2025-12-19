@@ -2,86 +2,38 @@ name: Snowflake Medallion Deployment
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  snowflake-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4️⃣ Generate data
-      - name: Generate demo data
+      - name: Generate data
         run: |
           python python/generate_data.py
 
-      # 5️⃣ Upload CSV files to Snowflake
-      - name: Upload CSVs to Snowflake
+      - name: Run pipeline
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
           SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
           SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
           SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-
-          # 🔥 REQUIRED CI FIX
           SNOWFLAKE_OCSP_FAIL_OPEN: true
           SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false
-
-        run: |
-          python - <<EOF
-          import snowflake.connector
-          import os
-
-          conn = snowflake.connector.connect(
-              account=os.environ["SNOWFLAKE_ACCOUNT"],
-              user=os.environ["SNOWFLAKE_USER"],
-              password=os.environ["SNOWFLAKE_PASSWORD"],
-              role=os.environ["SNOWFLAKE_ROLE"],
-              warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-              ocsp_fail_open=True
-          )
-
-          cur = conn.cursor()
-          cur.execute("PUT file://customers.csv @~ AUTO_COMPRESS=FALSE")
-          cur.execute("PUT file://orders.csv @~ AUTO_COMPRESS=FALSE")
-          cur.close()
-          conn.close()
-          EOF
-
-      # 6️⃣ Run SQL layers
-      - name: Run Snowflake SQL
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-
-          # 🔥 REQUIRED CI FIX
-          SNOWFLAKE_OCSP_FAIL_OPEN: true
-          SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false
-
         run: |
           python python/run_sql.py
-
-      # 7️⃣ Done
-      - name: Pipeline finished
-        run: echo "✅ Snowflake pipeline executed successfully"
