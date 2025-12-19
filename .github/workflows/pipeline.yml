@@ -8,53 +8,64 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     env:
       SNOWFLAKE_OCSP_FAIL_OPEN: true
-      SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false  
+      SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
 
     steps:
-      - uses: actions/checkout@v4
-      
+      # 1️⃣ Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2️⃣ Setup Python
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python-version: "3.11"
 
-      - name: Verify installed packages
+      # 3️⃣ Install dependencies (FORCED, NO CACHE, CORRECT DIR)
+      - name: Install dependencies
+        working-directory: ${{ github.workspace }}
         run: |
-          echo "Python version:" && python -V
-          echo "Installed packages:" && pip list
-      
+          echo "Working directory:"
+          pwd
+          echo "Files:"
+          ls -la
+          python -m pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+
+      # 4️⃣ VERIFY pandas (THIS IS THE KEY PROOF STEP)
+      - name: Verify pandas install
+        working-directory: ${{ github.workspace }}
+        run: |
+          pip show pandas
+          python -c "import pandas; print('pandas version:', pandas.__version__)"
+
+      # 5️⃣ Generate sample data
       - name: Generate data
+        working-directory: ${{ github.workspace }}
         run: python generate_data.py
-      
+
+      # 6️⃣ Deploy Snowflake objects
       - name: Deploy infrastructure
+        working-directory: ${{ github.workspace }}
         run: python deploy.py
-        env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      
+
+      # 7️⃣ Load RAW layer (pandas / write_pandas)
       - name: Load raw data
+        working-directory: ${{ github.workspace }}
         run: python load_raw.py
-        env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      
+
+      # 8️⃣ Transform layers
       - name: Transform data
+        working-directory: ${{ github.workspace }}
         run: python transform.py
-        env:
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-      
+
+      # 9️⃣ Summary
       - name: Summary
         run: |
-          echo "✅ Pipeline completed successfully!"
-          echo "📊 Data loaded through medallion layers:"
-          echo "   🥉 RAW_DB.STAGE (customers_raw, orders_raw)"
-          echo "   🥈 CURATED_DB.DATA (customers, orders)"
-          echo "   🥇 PUBLISH_DB.ANALYTICS (customer_summary, daily_sales)"
+          echo "✅ Pipeline completed successfully"
+          echo "🥉 RAW → 🥈 CURATED → 🥇 PUBLISH"
