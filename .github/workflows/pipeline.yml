@@ -9,7 +9,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      SNOWFLAKE_OCSP_FAIL_OPEN: true   # ⭐ REQUIRED FIX
+      SNOWFLAKE_OCSP_FAIL_OPEN: true
+      SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: false  
 
     steps:
       - uses: actions/checkout@v4
