@@ -1,70 +1,40 @@
-import csv
+import pandas as pd
 import random
-from datetime import date, timedelta
-from pathlib import Path
+from datetime import datetime, timedelta
+import uuid
 
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(exist_ok=True)
+def generate_customers(n=50):
+    data = []
+    for _ in range(n):
+        cid = uuid.uuid4().int % 1000000
+        data.append({
+            "customer_id": cid,
+            "customer_name": f"Customer_{cid}",
+            "email": f"cust_{cid}@email.com",
+            "country": random.choice(["US", "UK", "IN"]),
+            "country_code": random.choice(["US", "GB", "IN"]),
+            "signup_date": datetime.now() - timedelta(days=random.randint(1, 1000)),
+            "status": random.choice(["Active", "Inactive"]),
+            "loyalty_points": random.randint(0, 5000)
+        })
+    return pd.DataFrame(data)
 
-CUSTOMERS = 100
-ORDERS = 300
+def generate_orders(n=100):
+    data = []
+    for _ in range(n):
+        oid = uuid.uuid4().int % 1000000
+        data.append({
+            "order_id": oid,
+            "customer_id": random.randint(1, 1000000),
+            "product": random.choice(["Laptop", "Tablet", "Mobile"]),
+            "quantity": random.randint(1, 5),
+            "amount": random.randint(500, 5000),
+            "order_date": datetime.now() - timedelta(days=random.randint(1, 365)),
+            "status": random.choice(["Shipped", "Pending", "Cancelled"])
+        })
+    return pd.DataFrame(data)
 
-today = date.today()
-
-# -----------------------
-# CUSTOMERS
-# -----------------------
-with open(DATA_DIR / "customers.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow([
-        "customer_id",
-        "customer_name",
-        "email",
-        "country",
-        "country_code",
-        "signup_date",
-        "status",
-        "loyalty_points"
-    ])
-
-    for i in range(1, CUSTOMERS + 1):
-        writer.writerow([
-            i,
-            f"First{i} Last{i}",
-            f"customer{i}@email.com",
-            random.choice(["US", "UK", "IN"]),
-            random.choice(["US", "GB", "IN"]),
-            today - timedelta(days=random.randint(1, 1000)),
-            random.choice(["Active", "Inactive"]),
-            random.randint(0, 500)
-        ])
-
-# -----------------------
-# ORDERS
-# -----------------------
-with open(DATA_DIR / "orders.csv", "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow([
-        "order_id",
-        "customer_id",
-        "product",
-        "quantity",
-        "amount",
-        "order_date",
-        "status"
-    ])
-
-    for i in range(1, ORDERS + 1):
-        qty = random.randint(1, 5)
-        price = random.randint(100, 500)
-        writer.writerow([
-            i,
-            random.randint(1, CUSTOMERS),
-            random.choice(["Laptop", "Tablet", "Mobile"]),
-            qty,
-            qty * price,
-            today - timedelta(days=random.randint(1, 365)),
-            random.choice(["Shipped", "Pending"])
-        ])
-
-print("✅ Fresh CSV data generated")
+if __name__ == "__main__":
+    generate_customers().to_csv("customers.csv", index=False)
+    generate_orders().to_csv("orders.csv", index=False)
+    print("✅ Fresh data generated")

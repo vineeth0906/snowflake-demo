@@ -1,106 +1,40 @@
-"""
-CI SAFE RAW LOAD
-- No S3
-- No PUT
-- No pandas
-- Correct Snowflake parameter binding
-"""
-
-import os
 import csv
+import os
 import snowflake.connector
-from pathlib import Path
-
-DATA_DIR = Path("data")
+import yaml
 
 print("Connecting to Snowflake...")
 
 conn = snowflake.connector.connect(
-    user=os.getenv("SNOWFLAKE_USER"),
-    password=os.getenv("SNOWFLAKE_PASSWORD"),
-    account=os.getenv("SNOWFLAKE_ACCOUNT"),
-    warehouse="COMPUTE_WH",
-    database="RAW_DB",
-    schema="STAGE"
+    account=os.environ["SNOWFLAKE_ACCOUNT"],
+    user=os.environ["SNOWFLAKE_USER"],
+    password=os.environ["SNOWFLAKE_PASSWORD"],
+    role=os.environ["SNOWFLAKE_ROLE"],
+    warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
 )
 
 cursor = conn.cursor()
 
-try:
-    print("=== Loading to Raw Layer (NO S3, CI SAFE) ===")
+print("=== Loading to Raw Layer (CI SAFE) ===")
 
-    # =========================
-    # LOAD CUSTOMERS
-    # =========================
-    print("Loading customers...")
-    cursor.execute("TRUNCATE TABLE CUSTOMERS_RAW")
+cursor.execute("TRUNCATE TABLE RAW_DB.STAGE.customers_raw")
+cursor.execute("TRUNCATE TABLE RAW_DB.STAGE.orders_raw")
 
-    customer_rows = []
-    with open(DATA_DIR / "customers.csv") as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            customer_rows.append((
-                int(r["customer_id"]),
-                r["customer_name"],
-                r["email"],
-                r["country"],
-                r["country_code"],
-                r["signup_date"],
-                r["status"],
-                int(r["loyalty_points"])
-            ))
+with open("customers.csv") as f:
+    rows = list(csv.reader(f))
 
-    cursor.executemany(
-        """
-        INSERT INTO CUSTOMERS_RAW
-        (customer_id, customer_name, email, country,
-         country_code, signup_date, status, loyalty_points)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        customer_rows
-    )
+cursor.executemany(
+    "INSERT INTO RAW_DB.STAGE.customers_raw VALUES (%s,%s,%s,%s)",
+    rows
+)
 
-    print(f"✓ Loaded {len(customer_rows)} customers")
+with open("orders.csv") as f:
+    rows = list(csv.reader(f))
 
-    # =========================
-    # LOAD ORDERS
-    # =========================
-    print("Loading orders...")
-    cursor.execute("TRUNCATE TABLE ORDERS_RAW")
+cursor.executemany(
+    "INSERT INTO RAW_DB.STAGE.orders_raw VALUES (%s,%s,%s,%s)",
+    rows
+)
 
-    order_rows = []
-    with open(DATA_DIR / "orders.csv") as f:
-        reader = csv.DictReader(f)
-        for r in reader:
-            order_rows.append((
-                int(r["order_id"]),
-                int(r["customer_id"]),
-                r["product"],
-                int(r["quantity"]),
-                int(r["amount"]),
-                r["order_date"],
-                r["status"]
-            ))
-
-    cursor.executemany(
-        """
-        INSERT INTO ORDERS_RAW
-        (order_id, customer_id, product,
-         quantity, amount, order_date, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        order_rows
-    )
-
-    print(f"✓ Loaded {len(order_rows)} orders")
-
-    conn.commit()
-    print("✅ RAW layer load completed successfully")
-
-except Exception as e:
-    print("❌ RAW load failed:", e)
-    raise
-
-finally:
-    cursor.close()
-    conn.close()
+conn.commit()
+print("✅ Raw load completed")
