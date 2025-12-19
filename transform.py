@@ -1,173 +1,117 @@
-"""Transform data through layers"""
+"""Transform data from RAW to CURATED and PUBLISH layers"""
+
 import os
 import yaml
 import snowflake.connector
-from dotenv import load_dotenv
 
-# Load config and optional .env
-load_dotenv()
-with open('config.yaml') as f:
+# Load config
+with open("config.yaml") as f:
     config = yaml.safe_load(f)
 
-# Prefer non-empty env vars
-sf_user = os.getenv('SNOWFLAKE_USER') or config['snowflake']['user']
-sf_password = os.getenv('SNOWFLAKE_PASSWORD') or config['snowflake']['password']
-
 print("Connecting to Snowflake...")
-conn = None
-cursor = None
+
+conn = snowflake.connector.connect(
+    account=config["snowflake"]["account"],
+    user=os.getenv("SNOWFLAKE_USER"),
+    password=os.getenv("SNOWFLAKE_PASSWORD"),
+    role=config["snowflake"]["role"],
+    warehouse=config["snowflake"]["warehouse"],
+    ocsp_fail_open=True
+)
+
+cursor = conn.cursor()
+
 try:
-    conn = snowflake.connector.connect(
-        account=config['snowflake']['account'],
-        user=sf_user,
-        password=sf_password,
-        role=config['snowflake']['role'],
-        warehouse=config['snowflake']['warehouse']
-    )
-    cursor = conn.cursor()
+    print("\n=== Transforming Data ===")
 
-    raw_db = config['databases']['raw']
-    curated_db = config['databases']['curated']
-    publish_db = config['databases']['publish']
-
-    print("\n=== Transforming Data ===\n")
-
-    # Transform Customers to Curated
+    # ----------------------------
+    # CURATED: CUSTOMERS
+    # ----------------------------
     print("Transforming customers to curated layer...")
-    cursor.execute(f"""
-        MERGE INTO {curated_db}.DATA.customers tgt
-        USING (
-            SELECT 
-                customer_id,
-                CONCAT(first_name, ' ', last_name) AS full_name,
-                LOWER(email) AS email,
-                country,
-                CASE country 
-                    WHEN 'USA' THEN 'US'
-                    WHEN 'UK' THEN 'GB'
-                    WHEN 'Canada' THEN 'CA'
-                    WHEN 'Germany' THEN 'DE'
-                    WHEN 'France' THEN 'FR'
-                    ELSE NULL
-                END AS country_code,
-                signup_date,
-                status,
-                CASE WHEN status = 'Active' THEN TRUE ELSE FALSE END AS is_active
-            FROM {raw_db}.STAGE.customers_raw
-        ) src
-        ON tgt.customer_id = src.customer_id
-        WHEN MATCHED THEN UPDATE SET
-            tgt.full_name = src.full_name,
-            tgt.status = src.status,
-            tgt.is_active = src.is_active
-        WHEN NOT MATCHED THEN INSERT VALUES (
-            src.customer_id, src.full_name, src.email, src.country, 
-            src.country_code, src.signup_date, src.status, src.is_active
-        )
-    """)
-    conn.commit()
-    print(f"✓ Customers transformed")
 
-    # Transform Orders to Curated
+    cursor.execute("USE DATABASE CURATED_DB")
+    cursor.execute("USE SCHEMA DATA")
+
+    cursor.execute("TRUNCATE TABLE CUSTOMERS")
+
+    cursor.execute("""
+        INSERT INTO CUSTOMERS
+        SELECT DISTINCT
+            customer_id,
+            first_name || ' ' || last_name AS full_name,
+            email,
+            country,
+            CASE
+                WHEN country = 'USA' THEN 'US'
+                WHEN country = 'UK' THEN 'GB'
+                ELSE 'OT'
+            END AS country_code,
+            DATEDIFF(day, signup_date, CURRENT_DATE()) AS days_since_signup,
+            status,
+            0 AS is_deleted
+        FROM RAW_DB.STAGE.CUSTOMERS_RAW
+    """)
+
+    print("✓ Customers curated")
+
+    # ----------------------------
+    # CURATED: ORDERS
+    # ----------------------------
     print("Transforming orders to curated layer...")
-    cursor.execute(f"""
-        MERGE INTO {curated_db}.DATA.orders tgt
-        USING (
-            SELECT 
-                order_id,
-                customer_id,
-                product,
-                quantity,
-                amount,
-                ROUND(amount * 0.10, 2) AS tax,
-                ROUND(amount * 1.10, 2) AS total,
-                order_date,
-                status
-            FROM {raw_db}.STAGE.orders_raw
-        ) src
-        ON tgt.order_id = src.order_id
-        WHEN MATCHED THEN UPDATE SET
-            tgt.status = src.status
-        WHEN NOT MATCHED THEN INSERT VALUES (
-            src.order_id, src.customer_id, src.product, src.quantity, 
-            src.amount, src.tax, src.total, src.order_date, src.status
-        )
-    """)
-    conn.commit()
-    print(f"✓ Orders transformed")
 
-    # Create Customer Summary (Publish Layer)
-    print("Creating customer summary...")
-    cursor.execute(f"""
-        MERGE INTO {publish_db}.ANALYTICS.customer_summary tgt
-        USING (
-            SELECT 
-                c.customer_id,
-                c.full_name,
-                c.country,
-                COUNT(o.order_id) AS total_orders,
-                COALESCE(SUM(o.total), 0) AS total_spent,
-                COALESCE(AVG(o.total), 0) AS avg_order_value,
-                CASE 
-                    WHEN COUNT(o.order_id) >= 10 THEN 'VIP'
-                    WHEN COUNT(o.order_id) >= 5 THEN 'Regular'
-                    ELSE 'New'
-                END AS customer_segment
-            FROM {curated_db}.DATA.customers c
-            LEFT JOIN {curated_db}.DATA.orders o ON c.customer_id = o.customer_id
-            GROUP BY c.customer_id, c.full_name, c.country
-        ) src
-        ON tgt.customer_id = src.customer_id
-        WHEN MATCHED THEN UPDATE SET
-            tgt.total_orders = src.total_orders,
-            tgt.total_spent = src.total_spent,
-            tgt.avg_order_value = src.avg_order_value,
-            tgt.customer_segment = src.customer_segment
-        WHEN NOT MATCHED THEN INSERT VALUES (
-            src.customer_id, src.full_name, src.country, src.total_orders,
-            src.total_spent, src.avg_order_value, src.customer_segment
-        )
-    """)
-    conn.commit()
-    print(f"✓ Customer summary created")
+    cursor.execute("TRUNCATE TABLE ORDERS")
 
-    # Create Daily Sales (Publish Layer)
-    print("Creating daily sales summary...")
-    cursor.execute(f"""
-        MERGE INTO {publish_db}.ANALYTICS.daily_sales tgt
-        USING (
-            SELECT 
-                order_date,
-                COUNT(order_id) AS total_orders,
-                SUM(total) AS total_revenue,
-                AVG(total) AS avg_order_value
-            FROM {curated_db}.DATA.orders
-            GROUP BY order_date
-        ) src
-        ON tgt.order_date = src.order_date
-        WHEN MATCHED THEN UPDATE SET
-            tgt.total_orders = src.total_orders,
-            tgt.total_revenue = src.total_revenue,
-            tgt.avg_order_value = src.avg_order_value
-        WHEN NOT MATCHED THEN INSERT VALUES (
-            src.order_date, src.total_orders, src.total_revenue, src.avg_order_value
-        )
+    cursor.execute("""
+        INSERT INTO ORDERS
+        SELECT DISTINCT
+            order_id,
+            customer_id,
+            product,
+            quantity,
+            amount,
+            order_date,
+            status
+        FROM RAW_DB.STAGE.ORDERS_RAW
     """)
-    conn.commit()
-    print(f"✓ Daily sales summary created")
 
-    print("\n✅ All transformations completed!\n")
+    print("✓ Orders curated")
+
+    # ----------------------------
+    # PUBLISH: ANALYTICS
+    # ----------------------------
+    print("Building publish layer...")
+
+    cursor.execute("USE DATABASE PUBLISH_DB")
+    cursor.execute("USE SCHEMA ANALYTICS")
+
+    cursor.execute("TRUNCATE TABLE CUSTOMER_SUMMARY")
+
+    cursor.execute("""
+        INSERT INTO CUSTOMER_SUMMARY
+        SELECT
+            c.customer_id,
+            c.full_name,
+            c.country,
+            COUNT(o.order_id) AS total_orders,
+            COALESCE(SUM(o.amount), 0) AS total_spent
+        FROM CURATED_DB.DATA.CUSTOMERS c
+        LEFT JOIN CURATED_DB.DATA.ORDERS o
+            ON c.customer_id = o.customer_id
+        GROUP BY
+            c.customer_id,
+            c.full_name,
+            c.country
+    """)
+
+    print("✓ Customer summary published")
+
+    conn.commit()
+    print("\n✅ Transform completed successfully")
+
 except Exception as e:
-    print(f"Error during transform: {e}")
+    print("Error during transform:", e)
     raise
+
 finally:
-    try:
-        if cursor:
-            cursor.close()
-    except Exception:
-        pass
-    try:
-        if conn:
-            conn.close()
-    except Exception:
-        pass
+    cursor.close()
+    conn.close()
