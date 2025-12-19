@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
+from snowflake.connector.util_text import split_statements
 
 # --------------------------------------------------
 # Snowflake connection
@@ -19,12 +20,22 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # --------------------------------------------------
-# 1️⃣ CREATE RAW LAYER (MULTI-STATEMENT SQL)
+# Helper: run multi-statement SQL safely
+# --------------------------------------------------
+def run_sql_file(path: str):
+    with open(path, "r") as f:
+        sql_text = f.read()
+
+    for stmt in split_statements(sql_text):
+        sql = stmt.strip()
+        if sql:
+            cursor.execute(sql)
+
+# --------------------------------------------------
+# 1️⃣ CREATE RAW LAYER
 # --------------------------------------------------
 print("🏗️ Creating RAW layer objects")
-
-with open("sql/raw.sql", "r") as f:
-    cursor.execute_string(f.read())
+run_sql_file("sql/raw.sql")
 
 # --------------------------------------------------
 # 2️⃣ LOAD RAW DATA (NO S3, NO PUT)
@@ -58,12 +69,13 @@ write_pandas(
 print("✅ RAW load completed")
 
 # --------------------------------------------------
-# 3️⃣ CURATED + PUBLISH LAYERS
+# 3️⃣ CURATED + PUBLISH
 # --------------------------------------------------
-for sql_file in ["sql/curated.sql", "sql/publish.sql"]:
-    print(f"▶ Executing {sql_file}")
-    with open(sql_file, "r") as f:
-        cursor.execute_string(f.read())
+print("▶ Running curated layer")
+run_sql_file("sql/curated.sql")
+
+print("▶ Running publish layer")
+run_sql_file("sql/publish.sql")
 
 # --------------------------------------------------
 # Cleanup
