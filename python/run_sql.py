@@ -21,32 +21,33 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # --------------------------------------------------
-# Helper: run multi-statement SQL files (3.6.0 SAFE)
+# Helper: execute multi-statement SQL
 # --------------------------------------------------
 def run_sql_file(path):
-    with open(path, "r") as f:
-        sql_text = f.read()
-
-    buffer = io.StringIO(sql_text)
-
-    for stmt, _ in split_statements(buffer):
-        stmt = stmt.strip()
-        if stmt:
-            cursor.execute(stmt)
+    with open(path) as f:
+        buffer = io.StringIO(f.read())
+        for stmt, _ in split_statements(buffer):
+            stmt = stmt.strip()
+            if stmt:
+                cursor.execute(stmt)
 
 # --------------------------------------------------
-# 1️⃣ RAW LAYER (DDL)
+# 1️⃣ RAW DDL
 # --------------------------------------------------
 print("🏗️ Creating RAW layer objects")
 run_sql_file("sql/raw.sql")
 
 # --------------------------------------------------
-# 2️⃣ LOAD RAW DATA (NO S3 / NO PUT)
+# 2️⃣ LOAD RAW DATA (FIXED)
 # --------------------------------------------------
 print("🔄 Loading RAW data using write_pandas()")
 
 customers_df = pd.read_csv("customers.csv")
 orders_df = pd.read_csv("orders.csv")
+
+# 🔑 THIS IS THE FIX
+customers_df.columns = [c.upper() for c in customers_df.columns]
+orders_df.columns = [c.upper() for c in orders_df.columns]
 
 cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.CUSTOMERS_RAW")
 cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.ORDERS_RAW")
@@ -80,9 +81,6 @@ run_sql_file("sql/curated.sql")
 print("▶ Running PUBLISH layer")
 run_sql_file("sql/publish.sql")
 
-# --------------------------------------------------
-# Cleanup
-# --------------------------------------------------
 cursor.close()
 conn.close()
 
