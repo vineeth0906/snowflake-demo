@@ -1,5 +1,0 @@
-snowflake:
-  raw_db: RAW_DB
-  curated_db: CURATED_DB
-  publish_db: PUBLISH_DB
-  schema: STAGE
