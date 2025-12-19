@@ -2,7 +2,6 @@ import os
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
-from snowflake.connector.util_text import execute_string
 
 # --------------------------------------------------
 # Snowflake connection
@@ -20,12 +19,12 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # --------------------------------------------------
-# 1️⃣ CREATE RAW LAYER (DDL)
+# 1️⃣ CREATE RAW LAYER (MULTI-STATEMENT SQL)
 # --------------------------------------------------
 print("🏗️ Creating RAW layer objects")
 
 with open("sql/raw.sql", "r") as f:
-    execute_string(conn, f.read())
+    cursor.execute_string(f.read())
 
 # --------------------------------------------------
 # 2️⃣ LOAD RAW DATA (NO S3, NO PUT)
@@ -35,7 +34,6 @@ print("🔄 Loading RAW data using write_pandas()")
 customers_df = pd.read_csv("customers.csv")
 orders_df = pd.read_csv("orders.csv")
 
-# Ensure clean reloads
 cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.customers_raw")
 cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.orders_raw")
 
@@ -65,7 +63,7 @@ print("✅ RAW load completed")
 for sql_file in ["sql/curated.sql", "sql/publish.sql"]:
     print(f"▶ Executing {sql_file}")
     with open(sql_file, "r") as f:
-        execute_string(conn, f.read())
+        cursor.execute_string(f.read())
 
 # --------------------------------------------------
 # Cleanup
