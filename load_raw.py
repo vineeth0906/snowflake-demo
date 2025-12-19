@@ -32,7 +32,9 @@ print("✓ Files uploaded")
 # Load customers
 print("Loading customers...")
 cursor.execute(f"""
-    COPY INTO {raw_db}.STAGE.customers_raw
+    COPY INTO {raw_db}.STAGE.customers_raw (
+        customer_id, first_name, last_name, email, country, signup_date, status
+    )
     FROM @{raw_db}.STAGE.FILES/customers.csv.gz
     FILE_FORMAT = (FORMAT_NAME = '{raw_db}.STAGE.CSV_FORMAT')
     PURGE = TRUE
@@ -43,7 +45,9 @@ print(f"✓ Loaded {result[1]} customers")
 # Load orders
 print("Loading orders...")
 cursor.execute(f"""
-    COPY INTO {raw_db}.STAGE.orders_raw
+    COPY INTO {raw_db}.STAGE.orders_raw (
+        order_id, customer_id, product, quantity, amount, order_date, status
+    )
     FROM @{raw_db}.STAGE.FILES/orders.csv.gz
     FILE_FORMAT = (FORMAT_NAME = '{raw_db}.STAGE.CSV_FORMAT')
     PURGE = TRUE
