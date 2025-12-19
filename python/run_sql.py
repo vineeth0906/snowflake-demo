@@ -1,23 +1,19 @@
 import os
-import pandas as pd
+import csv
 import subprocess
 import snowflake.connector
-from snowflake.connector.pandas_tools import write_pandas
 
 # Generate fresh data
 subprocess.run(["python", "python/generate_data.py"], check=True)
 
-# Connect to Snowflake (CRITICAL FIX HERE)
+# Connect to Snowflake
 conn = snowflake.connector.connect(
     account=os.environ["SNOWFLAKE_ACCOUNT"],
     user=os.environ["SNOWFLAKE_USER"],
     password=os.environ["SNOWFLAKE_PASSWORD"],
     role=os.environ["SNOWFLAKE_ROLE"],
     warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    ocsp_fail_open=True,
-    session_parameters={
-        "CLIENT_DISABLE_S3_ACCELERATION": True
-    }
+    ocsp_fail_open=True
 )
 
 cursor = conn.cursor()
@@ -32,30 +28,57 @@ def run_sql_file(path):
 print("🏗️ Creating RAW layer")
 run_sql_file("sql/raw.sql")
 
-print("🔄 Loading RAW data")
+print("🔄 Loading RAW data WITHOUT S3")
 
-customers_df = pd.read_csv("data/customers.csv")
-orders_df = pd.read_csv("data/orders.csv")
+# Load CUSTOMERS
+with open("data/customers.csv", newline="") as f:
+    reader = csv.DictReader(f)
+    rows = [
+        (
+            r["CUSTOMER_ID"],
+            r["FIRST_NAME"],
+            r["LAST_NAME"],
+            r["EMAIL"],
+            r["COUNTRY"],
+            r["SIGNUP_DATE"],
+            r["STATUS"]
+        )
+        for r in reader
+    ]
 
-write_pandas(
-    conn,
-    customers_df,
-    table_name="CUSTOMERS_RAW",
-    database="RAW_DB",
-    schema="STAGE",
-    auto_create_table=False
+cursor.executemany(
+    """
+    INSERT INTO RAW_DB.STAGE.CUSTOMERS_RAW
+    (CUSTOMER_ID, FIRST_NAME, LAST_NAME, EMAIL, COUNTRY, SIGNUP_DATE, STATUS)
+    VALUES (%s,%s,%s,%s,%s,%s,%s)
+    """,
+    rows
 )
 
-write_pandas(
-    conn,
-    orders_df,
-    table_name="ORDERS_RAW",
-    database="RAW_DB",
-    schema="STAGE",
-    auto_create_table=False
+# Load ORDERS
+with open("data/orders.csv", newline="") as f:
+    reader = csv.DictReader(f)
+    rows = [
+        (
+            r["ORDER_ID"],
+            r["CUSTOMER_ID"],
+            r["ORDER_DATE"],
+            r["AMOUNT"],
+            r["STATUS"]
+        )
+        for r in reader
+    ]
+
+cursor.executemany(
+    """
+    INSERT INTO RAW_DB.STAGE.ORDERS_RAW
+    (ORDER_ID, CUSTOMER_ID, ORDER_DATE, AMOUNT, STATUS)
+    VALUES (%s,%s,%s,%s,%s)
+    """,
+    rows
 )
 
-print("✅ RAW load completed")
+print("✅ RAW load completed (NO S3 USED)")
 
 print("▶ Running CURATED layer")
 run_sql_file("sql/curated.sql")
