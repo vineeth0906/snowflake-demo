@@ -1,66 +1,70 @@
-import pandas as pd
+import csv
 import random
-from datetime import datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 
-# Output directory
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 
-# Unique seed per run (IMPORTANT)
-run_id = int(datetime.utcnow().timestamp())
+CUSTOMERS = 100
+ORDERS = 300
 
-num_customers = 100
-num_orders = 300
-
-countries = [
-    ("USA", "US"), ("India", "IN"), ("UK", "GB"),
-    ("Canada", "CA"), ("Germany", "DE")
-]
-
-products = ["Laptop", "Mobile", "Tablet", "Headphones"]
+today = date.today()
 
 # -----------------------
-# Customers
+# CUSTOMERS
 # -----------------------
-customers = []
-for i in range(num_customers):
-    customer_id = run_id + i
-    country, country_code = random.choice(countries)
+with open(DATA_DIR / "customers.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow([
+        "customer_id",
+        "customer_name",
+        "email",
+        "country",
+        "country_code",
+        "signup_date",
+        "status",
+        "loyalty_points"
+    ])
 
-    customers.append({
-        "customer_id": customer_id,
-        "customer_name": f"First{i} Last{i}",
-        "email": f"customer{customer_id}@email.com",
-        "country": country,
-        "country_code": country_code,
-        "signup_date": datetime.utcnow().date(),
-        "status": random.choice(["Active", "Inactive"]),
-        "loyalty_points": random.randint(0, 5000)
-    })
-
-customers_df = pd.DataFrame(customers)
-customers_df.to_csv(DATA_DIR / "customers.csv", index=False)
+    for i in range(1, CUSTOMERS + 1):
+        writer.writerow([
+            i,
+            f"First{i} Last{i}",
+            f"customer{i}@email.com",
+            random.choice(["US", "UK", "IN"]),
+            random.choice(["US", "GB", "IN"]),
+            today - timedelta(days=random.randint(1, 1000)),
+            random.choice(["Active", "Inactive"]),
+            random.randint(0, 500)
+        ])
 
 # -----------------------
-# Orders (INTENTIONALLY MULTIPLE PER CUSTOMER)
+# ORDERS
 # -----------------------
-orders = []
-for i in range(num_orders):
-    order_id = run_id + i  # unique per run
-    customer = random.choice(customers)
+with open(DATA_DIR / "orders.csv", "w", newline="") as f:
+    writer = csv.writer(f)
+    writer.writerow([
+        "order_id",
+        "customer_id",
+        "product",
+        "quantity",
+        "amount",
+        "order_date",
+        "status"
+    ])
 
-    orders.append({
-        "order_id": order_id,
-        "customer_id": customer["customer_id"],
-        "product": random.choice(products),
-        "quantity": random.randint(1, 5),
-        "amount": random.randint(100, 2000),
-        "order_date": datetime.utcnow() - timedelta(days=random.randint(0, 30)),
-        "status": random.choice(["Shipped", "Pending", "Cancelled"])
-    })
+    for i in range(1, ORDERS + 1):
+        qty = random.randint(1, 5)
+        price = random.randint(100, 500)
+        writer.writerow([
+            i,
+            random.randint(1, CUSTOMERS),
+            random.choice(["Laptop", "Tablet", "Mobile"]),
+            qty,
+            qty * price,
+            today - timedelta(days=random.randint(1, 365)),
+            random.choice(["Shipped", "Pending"])
+        ])
 
-orders_df = pd.DataFrame(orders)
-orders_df.to_csv(DATA_DIR / "orders.csv", index=False)
-
-print("✅ New customer & order data generated")
+print("✅ Fresh CSV data generated")

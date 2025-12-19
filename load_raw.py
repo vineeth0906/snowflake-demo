@@ -1,6 +1,8 @@
 """
-Load data into RAW layer
-CI SAFE: No PUT, No S3, No write_pandas
+CI SAFE RAW LOAD
+- No S3
+- No PUT
+- No pandas
 """
 
 import os
@@ -26,36 +28,32 @@ cursor = conn.cursor()
 try:
     print("=== Loading to Raw Layer (NO S3, CI SAFE) ===")
 
-    # -------------------------
-    # LOAD CUSTOMERS
-    # -------------------------
+    # -----------------------
+    # CUSTOMERS
+    # -----------------------
     print("Loading customers...")
     cursor.execute("TRUNCATE TABLE CUSTOMERS_RAW")
 
-    customers_file = DATA_DIR / "customers.csv"
-    with open(customers_file, newline="") as f:
-        reader = csv.reader(f)
-        next(reader)  # skip header
-
-        rows = [
-            (
-                int(r[0]),   # customer_id
-                r[1],        # customer_name
-                r[2],        # email
-                r[3],        # country
-                r[4],        # country_code
-                r[5],        # signup_date
-                r[6],        # status
-                int(r[7])    # loyalty_points
-            )
-            for r in reader
-        ]
+    rows = []
+    with open(DATA_DIR / "customers.csv") as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            rows.append((
+                int(r["customer_id"]),
+                r["customer_name"],
+                r["email"],
+                r["country"],
+                r["country_code"],
+                r["signup_date"],
+                r["status"],
+                int(r["loyalty_points"])
+            ))
 
     cursor.executemany(
         """
         INSERT INTO CUSTOMERS_RAW
-        (customer_id, customer_name, email, country, country_code,
-         signup_date, status, loyalty_points)
+        (customer_id, customer_name, email, country,
+         country_code, signup_date, status, loyalty_points)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """,
         rows
@@ -63,35 +61,31 @@ try:
 
     print(f"✓ Loaded {len(rows)} customers")
 
-    # -------------------------
-    # LOAD ORDERS
-    # -------------------------
+    # -----------------------
+    # ORDERS
+    # -----------------------
     print("Loading orders...")
     cursor.execute("TRUNCATE TABLE ORDERS_RAW")
 
-    orders_file = DATA_DIR / "orders.csv"
-    with open(orders_file, newline="") as f:
-        reader = csv.reader(f)
-        next(reader)
-
-        rows = [
-            (
-                int(r[0]),   # order_id
-                int(r[1]),   # customer_id
-                r[2],        # product
-                int(r[3]),   # quantity
-                int(r[4]),   # amount
-                r[5],        # order_date
-                r[6]         # status
-            )
-            for r in reader
-        ]
+    rows = []
+    with open(DATA_DIR / "orders.csv") as f:
+        reader = csv.DictReader(f)
+        for r in reader:
+            rows.append((
+                int(r["order_id"]),
+                int(r["customer_id"]),
+                r["product"],
+                int(r["quantity"]),
+                int(r["amount"]),
+                r["order_date"],
+                r["status"]
+            ))
 
     cursor.executemany(
         """
         INSERT INTO ORDERS_RAW
-        (order_id, customer_id, product, quantity,
-         amount, order_date, status)
+        (order_id, customer_id, product,
+         quantity, amount, order_date, status)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         """,
         rows
@@ -100,10 +94,10 @@ try:
     print(f"✓ Loaded {len(rows)} orders")
 
     conn.commit()
-    print("✅ RAW layer load completed successfully!")
+    print("✅ RAW layer load completed successfully")
 
 except Exception as e:
-    print("❌ Error during load:", e)
+    print("❌ RAW load failed:", e)
     raise
 
 finally:
