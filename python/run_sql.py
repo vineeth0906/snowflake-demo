@@ -3,6 +3,9 @@ import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
 
+# ----------------------------
+# Connect to Snowflake
+# ----------------------------
 conn = snowflake.connector.connect(
     account=os.environ["SNOWFLAKE_ACCOUNT"],
     user=os.environ["SNOWFLAKE_USER"],
@@ -10,11 +13,21 @@ conn = snowflake.connector.connect(
     role=os.environ["SNOWFLAKE_ROLE"],
     warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
     ocsp_fail_open=True,
-    insecure_mode=True   # 🔥 critical for CI
+    insecure_mode=True
 )
 
 cursor = conn.cursor()
 
+# ----------------------------
+# 1️⃣ CREATE RAW STRUCTURES
+# ----------------------------
+print("🏗️ Creating RAW tables")
+with open("sql/raw.sql") as f:
+    cursor.execute(f.read())
+
+# ----------------------------
+# 2️⃣ LOAD RAW DATA
+# ----------------------------
 print("🔄 Loading RAW data using write_pandas()")
 
 customers_df = pd.read_csv("customers.csv")
@@ -41,15 +54,15 @@ write_pandas(
 
 print("✅ RAW load completed")
 
-# ---------------------------
-# Run SQL layers
-# ---------------------------
+# ----------------------------
+# 3️⃣ CURATED & PUBLISH
+# ----------------------------
 for file in ["sql/curated.sql", "sql/publish.sql"]:
-    print(f"Running {file}")
+    print(f"▶ Running {file}")
     with open(file) as f:
         cursor.execute(f.read())
 
 cursor.close()
 conn.close()
 
-print("✅ Deployment completed")
+print("✅ Pipeline completed successfully")
