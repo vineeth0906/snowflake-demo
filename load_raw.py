@@ -1,10 +1,9 @@
-"""Load data to Raw layer using write_pandas (CI-safe)"""
+"""Load data to Raw layer using pure SQL INSERT (CI SAFE)"""
 
 import os
 import yaml
 import pandas as pd
 import snowflake.connector
-from snowflake.connector.pandas_tools import write_pandas
 from pathlib import Path
 
 # Load config
@@ -24,37 +23,53 @@ conn = snowflake.connector.connect(
     ocsp_fail_open=True
 )
 
-print("\n=== Loading to Raw Layer (CI SAFE) ===\n")
+cursor = conn.cursor()
 
-# Paths
+print("\n=== Loading to Raw Layer (NO S3, CI SAFE) ===\n")
+
+# Read CSVs
 data_dir = Path("data")
-customers_file = data_dir / "customers.csv"
-orders_file = data_dir / "orders.csv"
+customers_df = pd.read_csv(data_dir / "customers.csv")
+orders_df = pd.read_csv(data_dir / "orders.csv")
 
-# Load CSVs
-customers_df = pd.read_csv(customers_file)
-orders_df = pd.read_csv(orders_file)
-
-# Write customers
+# -----------------------
+# Load CUSTOMERS
+# -----------------------
 print("Loading customers...")
-success, nchunks, nrows, _ = write_pandas(
-    conn,
-    customers_df,
-    table_name="CUSTOMERS_RAW",
-    overwrite=True
-)
-print(f"✓ Customers loaded: {nrows}")
 
-# Write orders
+customers_sql = """
+INSERT INTO CUSTOMERS_RAW
+(customer_id, first_name, last_name, email, country, signup_date, status)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+"""
+
+cursor.executemany(
+    customers_sql,
+    customers_df.values.tolist()
+)
+
+print(f"✓ Customers inserted: {len(customers_df)}")
+
+# -----------------------
+# Load ORDERS
+# -----------------------
 print("Loading orders...")
-success, nchunks, nrows, _ = write_pandas(
-    conn,
-    orders_df,
-    table_name="ORDERS_RAW",
-    overwrite=True
+
+orders_sql = """
+INSERT INTO ORDERS_RAW
+(order_id, customer_id, product, quantity, amount, order_date, status)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+"""
+
+cursor.executemany(
+    orders_sql,
+    orders_df.values.tolist()
 )
-print(f"✓ Orders loaded: {nrows}")
 
-print("\n✅ Raw layer load completed successfully\n")
+print(f"✓ Orders inserted: {len(orders_df)}")
 
+conn.commit()
+cursor.close()
 conn.close()
+
+print("\n✅ Raw layer load completed successfully (NO S3 USED)\n")
