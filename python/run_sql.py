@@ -6,7 +6,7 @@ from snowflake.connector.pandas_tools import write_pandas
 from snowflake.connector.util_text import split_statements
 
 # --------------------------------------------------
-# Snowflake connection
+# Connect to Snowflake
 # --------------------------------------------------
 conn = snowflake.connector.connect(
     account=os.environ["SNOWFLAKE_ACCOUNT"],
@@ -21,9 +21,9 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # --------------------------------------------------
-# Helper: run multi-statement SQL (3.6.0 SAFE)
+# Helper: run multi-statement SQL files (3.6.0 SAFE)
 # --------------------------------------------------
-def run_sql_file(path: str):
+def run_sql_file(path):
     with open(path, "r") as f:
         sql_text = f.read()
 
@@ -35,26 +35,26 @@ def run_sql_file(path: str):
             cursor.execute(stmt)
 
 # --------------------------------------------------
-# 1️⃣ RAW LAYER
+# 1️⃣ RAW LAYER (DDL)
 # --------------------------------------------------
 print("🏗️ Creating RAW layer objects")
 run_sql_file("sql/raw.sql")
 
 # --------------------------------------------------
-# 2️⃣ LOAD RAW DATA
+# 2️⃣ LOAD RAW DATA (NO S3 / NO PUT)
 # --------------------------------------------------
 print("🔄 Loading RAW data using write_pandas()")
 
 customers_df = pd.read_csv("customers.csv")
 orders_df = pd.read_csv("orders.csv")
 
-cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.customers_raw")
-cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.orders_raw")
+cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.CUSTOMERS_RAW")
+cursor.execute("TRUNCATE TABLE IF EXISTS RAW_DB.STAGE.ORDERS_RAW")
 
 write_pandas(
     conn,
     customers_df,
-    table_name="customers_raw",
+    table_name="CUSTOMERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False
@@ -63,7 +63,7 @@ write_pandas(
 write_pandas(
     conn,
     orders_df,
-    table_name="orders_raw",
+    table_name="ORDERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False
@@ -74,10 +74,10 @@ print("✅ RAW load completed")
 # --------------------------------------------------
 # 3️⃣ CURATED + PUBLISH
 # --------------------------------------------------
-print("▶ Running curated layer")
+print("▶ Running CURATED layer")
 run_sql_file("sql/curated.sql")
 
-print("▶ Running publish layer")
+print("▶ Running PUBLISH layer")
 run_sql_file("sql/publish.sql")
 
 # --------------------------------------------------
