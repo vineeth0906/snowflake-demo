@@ -4,18 +4,20 @@ import subprocess
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
 
-# Generate fresh data every run
-os.makedirs("data", exist_ok=True)
+# Generate fresh data
 subprocess.run(["python", "python/generate_data.py"], check=True)
 
-# Connect to Snowflake
+# Connect to Snowflake (CRITICAL FIX HERE)
 conn = snowflake.connector.connect(
     account=os.environ["SNOWFLAKE_ACCOUNT"],
     user=os.environ["SNOWFLAKE_USER"],
     password=os.environ["SNOWFLAKE_PASSWORD"],
     role=os.environ["SNOWFLAKE_ROLE"],
     warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
-    ocsp_fail_open=True
+    ocsp_fail_open=True,
+    session_parameters={
+        "CLIENT_DISABLE_S3_ACCELERATION": True
+    }
 )
 
 cursor = conn.cursor()
@@ -31,13 +33,14 @@ print("🏗️ Creating RAW layer")
 run_sql_file("sql/raw.sql")
 
 print("🔄 Loading RAW data")
+
 customers_df = pd.read_csv("data/customers.csv")
 orders_df = pd.read_csv("data/orders.csv")
 
 write_pandas(
     conn,
     customers_df,
-    "CUSTOMERS_RAW",
+    table_name="CUSTOMERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False
@@ -46,7 +49,7 @@ write_pandas(
 write_pandas(
     conn,
     orders_df,
-    "ORDERS_RAW",
+    table_name="ORDERS_RAW",
     database="RAW_DB",
     schema="STAGE",
     auto_create_table=False
