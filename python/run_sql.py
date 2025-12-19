@@ -1,4 +1,5 @@
 import os
+import io
 import pandas as pd
 import snowflake.connector
 from snowflake.connector.pandas_tools import write_pandas
@@ -20,25 +21,27 @@ conn = snowflake.connector.connect(
 cursor = conn.cursor()
 
 # --------------------------------------------------
-# Helper: run multi-statement SQL safely
+# Helper: run multi-statement SQL (3.6.0 SAFE)
 # --------------------------------------------------
 def run_sql_file(path: str):
     with open(path, "r") as f:
         sql_text = f.read()
 
-    for stmt in split_statements(sql_text):
-        sql = stmt.strip()
-        if sql:
-            cursor.execute(sql)
+    sql_buffer = io.StringIO(sql_text)
+
+    for stmt in split_statements(sql_buffer):
+        stmt = stmt.strip()
+        if stmt:
+            cursor.execute(stmt)
 
 # --------------------------------------------------
-# 1️⃣ CREATE RAW LAYER
+# 1️⃣ RAW LAYER
 # --------------------------------------------------
 print("🏗️ Creating RAW layer objects")
 run_sql_file("sql/raw.sql")
 
 # --------------------------------------------------
-# 2️⃣ LOAD RAW DATA (NO S3, NO PUT)
+# 2️⃣ LOAD RAW DATA (NO S3)
 # --------------------------------------------------
 print("🔄 Loading RAW data using write_pandas()")
 
