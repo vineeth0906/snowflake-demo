@@ -9,10 +9,14 @@ with open('config.yaml') as f:
 
 # Connect
 print("Connecting to Snowflake...")
+# Prefer non-empty environment variables, otherwise fall back to config
+sf_user = os.getenv('SNOWFLAKE_USER') or config['snowflake']['user']
+sf_password = os.getenv('SNOWFLAKE_PASSWORD') or config['snowflake']['password']
+
 conn = snowflake.connector.connect(
     account=config['snowflake']['account'],
-    user=os.getenv('SNOWFLAKE_USER', config['snowflake']['user']),
-    password=os.getenv('SNOWFLAKE_PASSWORD', config['snowflake']['password']),
+    user=sf_user,
+    password=sf_password,
     role=config['snowflake']['role'],
     warehouse=config['snowflake']['warehouse']
 )
