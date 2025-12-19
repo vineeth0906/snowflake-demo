@@ -31,27 +31,37 @@ print("✓ Files uploaded")
 
 # Load customers
 print("Loading customers...")
-cursor.execute(f"""
+customers_sql = f"""
     COPY INTO {raw_db}.STAGE.customers_raw (
         customer_id, first_name, last_name, email, country, signup_date, status
     )
     FROM @{raw_db}.STAGE.FILES/customers.csv.gz
-    FILE_FORMAT = (FORMAT_NAME = '{raw_db}.STAGE.CSV_FORMAT')
+    FILE_FORMAT = (
+        TYPE='CSV' FIELD_DELIMITER=',' SKIP_HEADER=1 NULL_IF=('NULL','null','')
+        ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE
+    )
     PURGE = TRUE
-""")
+"""
+print(customers_sql)
+cursor.execute(customers_sql)
 result = cursor.fetchone()
 print(f"✓ Loaded {result[1]} customers")
 
 # Load orders
 print("Loading orders...")
-cursor.execute(f"""
+orders_sql = f"""
     COPY INTO {raw_db}.STAGE.orders_raw (
         order_id, customer_id, product, quantity, amount, order_date, status
     )
     FROM @{raw_db}.STAGE.FILES/orders.csv.gz
-    FILE_FORMAT = (FORMAT_NAME = '{raw_db}.STAGE.CSV_FORMAT')
+    FILE_FORMAT = (
+        TYPE='CSV' FIELD_DELIMITER=',' SKIP_HEADER=1 NULL_IF=('NULL','null','')
+        ERROR_ON_COLUMN_COUNT_MISMATCH=FALSE
+    )
     PURGE = TRUE
-""")
+"""
+print(orders_sql)
+cursor.execute(orders_sql)
 result = cursor.fetchone()
 print(f"✓ Loaded {result[1]} orders")
 
