@@ -1,4 +1,4 @@
-name: Snowflake SQL Deployment Pipeline
+name: Snowflake SQL Deployment
 
 on:
   push:
@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -25,9 +25,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Snowflake pipeline
+        run: |
+          python python/run_sql.py
         env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }
+          SNOWFLAKE_ACCOUNT: "${{ secrets.SNOWFLAKE_ACCOUNT }}"
+          SNOWFLAKE_USER: "${{ secrets.SNOWFLAKE_USER }}"
+          SNOWFLAKE_PASSWORD: "${{ secrets.SNOWFLAKE_PASSWORD }}"
+          SNOWFLAKE_ROLE: "${{ secrets.SNOWFLAKE_ROLE }}"
+          SNOWFLAKE_WAREHOUSE: "${{ secrets.SNOWFLAKE_WAREHOUSE }}"
+          SNOWFLAKE_OCSP_FAIL_OPEN: "true"
+          SNOWFLAKE_S3_USE_ACCELERATE_ENDPOINT: "false"
