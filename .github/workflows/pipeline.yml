@@ -8,6 +8,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      SNOWFLAKE_OCSP_FAIL_OPEN: true   # ⭐ REQUIRED FIX
+
     steps:
       - uses: actions/checkout@v4
       
